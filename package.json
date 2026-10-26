@@ -18,3 +18,101 @@
     "vite": "^8.0.16"
   }
 }
+
+17. package.json Explained
+Field	Meaning
+name	Project name (jobconnect-frontend)
+version	Project version number (1.0.0)
+private: true	Stops the project from being published to npm by accident
+type: "module"	Lets you use import/export (ES modules) in all .js files, including vite.config.js
+scripts	Shortcuts you run with npm run <name>
+dependencies	Packages the project needs
+18. Scripts
+Command	What it does
+npm run dev	Starts the Vite dev server at http://localhost:5173 with instant reload
+npm run build	Creates the optimized production files in dist/
+npm run preview	Serves the built dist/ folder locally so you can test before deploying
+19. Dependencies Explained
+Package	Purpose in JobConnect
+react, react-dom	Core library and the code that renders it in the browser
+react-router-dom	Page routing, public and protected routes, redirects
+axios	HTTP calls to the backend, with the JWT interceptor
+bootstrap	Ready-made responsive styles (grid, buttons, forms, tables)
+vite	Dev server and build tool
+@vitejs/plugin-react	Lets Vite handle JSX and Fast Refresh
+
+The ^ before a version (for example ^1.6.7) allows compatible minor and patch updates but not a new major version.
+
+20. Suggested Improvements
+
+Move build tools to devDependencies. vite and @vitejs/plugin-react are only needed to build the app, not at runtime. This is the usual convention:
+
+json
+{
+  "dependencies": {
+    "axios": "^1.6.7",
+    "bootstrap": "^5.3.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.22.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
+    "vite": "^8.0.16"
+  }
+}
+
+Add a test script for the protected-route exercise:
+
+bash
+npm install -D vitest @testing-library/react @testing-library/jest-dom jsdom
+json
+"scripts": {
+  "dev": "vite",
+  "build": "vite build",
+  "preview": "vite preview",
+  "test": "vitest"
+}
+
+Vitest also needs test: { environment: "jsdom" } added inside defineConfig in vite.config.js.
+
+21. Using Bootstrap
+
+Import it once in main.jsx, before your own CSS so your styles can override it:
+
+jsx
+import "bootstrap/dist/css/bootstrap.min.css";
+import "./styles.css";
+
+Example of Bootstrap classes in a job card:
+
+jsx
+<div className="card shadow-sm h-100">
+  <div className="card-body">
+    <h5 className="card-title">{job.title}</h5>
+    <p className="text-muted">{job.location}</p>
+    <Link to={`/jobs/${job.id}`} className="btn btn-primary btn-sm">View</Link>
+  </div>
+</div>
+22. Installation Troubleshooting
+Problem	Fix
+npm install fails with a peer dependency error	Check that the vite and @vitejs/plugin-react versions are compatible; try npm install --legacy-peer-deps only as a last resort
+Errors about the Node version	Newer Vite versions need a newer Node than 18. Check Vite’s documentation and update the “Requirements” section of your README to match
+Changes not showing	Stop and restart npm run dev
+Strange errors after switching versions	Delete node_modules and package-lock.json, then run npm install again
+23. Useful Commands
+bash
+npm install                 # install everything in package.json
+npm install axios           # add a package
+npm install -D vitest       # add a dev-only package
+npm outdated                # see packages with newer versions
+npm audit --omit=dev        # check production dependencies for known issues
+npm run build && npm run preview   # test the production build locally
+
+24. Quick Revision Questions
+What does "type": "module" change?
+What is the difference between dependencies and devDependencies?
+What does the ^ in ^1.6.7 mean?
+Which script creates the dist/ folder, and which one lets you test it locally?
+Why is private: true set?
+Why import Bootstrap before your own styles.css?
