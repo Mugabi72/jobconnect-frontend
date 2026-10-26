@@ -223,6 +223,210 @@ Login form → POST /auth/login → backend returns { token, user }
 
 I can also turn this into a Word document or expand any section, such as a full `AuthContext` walkthrough or exam-style Q&A on the project.
 
+
+Your README already covers the main ideas, so I've added new sections that continue from section 8 without repeating it. You can paste them in directly.
+
+---
+
+## 9. Key Files Explained
+
+**`src/services/api.js`: the API client with a global 401 handler**
+```js
+import axios from "axios";
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL, // from .env
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
+    }
+    return Promise.reject(err);
+  }
+);
+
+export default api;
+```
+
+**`src/context/AuthContext.jsx`: login state shared across the app**
+```jsx
+import { createContext, useContext, useState } from "react";
+import api from "../services/api";
+
+const AuthContext = createContext();
+export const useAuth = () => useContext(AuthContext);
+
+export function AuthProvider({ children }) {
+  // Restore the saved session on page refresh
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem("user");
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const login = async (email, password) => {
+    const { data } = await api.post("/auth/login", { email, password });
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("user", JSON.stringify(data.user));
+    setUser(data.user);
+    return data.user;
+  };
+
+  const logout = () => {
+    localStorage.clear();
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+```
+
+**`src/App.jsx`: route groups by role**
+```jsx
+<Routes>
+  {/* Public */}
+  <Route path="/" element={<Home />} />
+  <Route path="/jobs" element={<Jobs />} />
+  <Route path="/jobs/:id" element={<JobDetails />} />
+  <Route path="/login" element={<Login />} />
+  <Route path="/register" element={<Register />} />
+
+  {/* Job seeker */}
+  <Route path="/seeker" element={
+    <ProtectedRoute roles={["jobseeker"]}><DashboardLayout /></ProtectedRoute>
+  }>
+    <Route index element={<SeekerDashboard />} />
+    <Route path="applications" element={<MyApplications />} />
+  </Route>
+
+  {/* Employer and admin follow the same pattern */}
+</Routes>
+```
+
+## 10. Typical API Endpoints Used
+
+| Action | Method and endpoint |
+| --- | --- |
+| Register | `POST /auth/register` |
+| Login | `POST /auth/login` |
+| List jobs | `GET /jobs` |
+| Job details | `GET /jobs/:id` |
+| Post a job (employer) | `POST /jobs` |
+| Apply for a job | `POST /applications` |
+| My applications | `GET /applications/me` |
+| Upload CV | `POST /profile/cv` |
+| Manage users (admin) | `GET /admin/users` |
+
+Check your backend repository for the exact paths, because they may differ slightly.
+
+## 11. Role Permissions at a Glance
+
+| Feature | Visitor | Job Seeker | Employer | Admin |
+| --- | :-: | :-: | :-: | :-: |
+| Browse jobs | ✅ | ✅ | ✅ | ✅ |
+| Apply for jobs | ❌ | ✅ | ❌ | ❌ |
+| Upload CV | ❌ | ✅ | ❌ | ❌ |
+| Post and manage own jobs | ❌ | ❌ | ✅ | ✅ |
+| View applicants | ❌ | ❌ | ✅ | ✅ |
+| Manage all users and jobs | ❌ | ❌ | ❌ | ✅ |
+
+## 12. Form Validation Example (Exercise Starter)
+
+```jsx
+const [errors, setErrors] = useState({});
+
+const validate = () => {
+  const e = {};
+  if (!email.trim()) e.email = "Email is required";
+  else if (!/\S+@\S+\.\S+/.test(email)) e.email = "Enter a valid email";
+  if (password.length < 6) e.password = "Password must be at least 6 characters";
+  setErrors(e);
+  return Object.keys(e).length === 0;
+};
+
+const handleSubmit = async (ev) => {
+  ev.preventDefault();
+  if (!validate()) return;
+  // call the API here
+};
+```
+Show each message under its field with `{errors.email && <small className="text-danger">{errors.email}</small>}`.
+
+## 13. Loading and Error Pattern
+
+```jsx
+const [jobs, setJobs] = useState([]);
+const [loading, setLoading] = useState(true);
+const [error, setError] = useState("");
+
+useEffect(() => {
+  const controller = new AbortController();
+  api.get("/jobs", { signal: controller.signal })
+    .then((res) => setJobs(res.data))
+    .catch((err) => {
+      if (err.name !== "CanceledError") setError("Could not load jobs.");
+    })
+    .finally(() => setLoading(false));
+  return () => controller.abort(); // cleanup on unmount
+}, []);
+```
+
+## 14. Testing Protected Routes (Vitest)
+
+```jsx
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
+
+test("redirects guests to login", () => {
+  render(
+    <MemoryRouter initialEntries={["/seeker"]}>
+      {/* AuthContext with user = null, then <App /> */}
+    </MemoryRouter>
+  );
+  expect(screen.getByText(/login/i)).toBeInTheDocument();
+});
+```
+Run with `npx vitest`.
+
+## 15. Glossary
+
+| Term | Meaning |
+| --- | --- |
+| **JWT** | A signed token that proves who the user is, sent with each request |
+| **Context** | React's way to share data (like the logged-in user) without passing props |
+| **Interceptor** | Axios code that runs on every request or response |
+| **Protected route** | A page that only certain logged-in roles can open |
+| **SPA** | Single-page app: one HTML file, with React Router changing the view |
+| **FormData** | Browser object for sending files and form fields together |
+| **CORS** | Browser rule controlling which origins may call the backend |
+
+## 16. Quick Revision Questions
+
+1. Why does the frontend store the JWT, and where is it stored?
+2. What does an Axios interceptor do, and why use one for the token?
+3. Why is hiding a route in the frontend not real security?
+4. Why must Vite environment variables start with `VITE_`?
+5. How does `FormData` differ from sending a normal JSON body?
+6. What causes "logged out on refresh", and how is it fixed?
+
+---
+
+I can also put the complete README, with all sections merged and the heading formatting fixed, into a Word document. A few headings in your pasted text are missing their `##` markers, so I'd tidy those at the same time.
+
  Useful Checks
 
 ```bash
